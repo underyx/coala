@@ -1,6 +1,7 @@
 import os
 import platform
 import re
+from functools import lru_cache
 
 from coala_decorators.decorators import yield_once
 from coalib.misc.Constants import GLOBBING_SPECIAL_CHARS
@@ -214,19 +215,27 @@ def fnmatch(name, patterns):
     -  '**':            Matches everything.
     """
     if isinstance(patterns, str):
-        patterns = [patterns]
+        patterns = (patterns,)
+    elif isinstance(patterns, list):
+        patterns = tuple(patterns)
+
     if len(patterns) == 0:
         return True
 
     name = os.path.normcase(name)
-    for pattern in patterns:
-        for pat in _iter_alternatives(pattern):
-            pat = os.path.expanduser(pat)
-            pat = os.path.normcase(pat)
-            match = re.compile(translate(pat)).match
-            if match(name) is not None:
-                return True
+
+    for match in _compile_pattern(patterns):
+        if match(name) is not None:
+            return True
     return False
+
+
+@lru_cache()
+def _compile_pattern(patterns):
+    return tuple(re.compile(translate(os.path.normcase(
+                     os.path.expanduser(pat)))).match
+                 for pattern in patterns
+                 for pat in _iter_alternatives(pattern))
 
 
 def _absolute_flat_glob(pattern):
