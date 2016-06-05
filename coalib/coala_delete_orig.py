@@ -1,31 +1,32 @@
 import os
+try:
+    import pathlib
+except ImportError:
+    import pathlib2 as pathlib
 
 from pyprint.ConsolePrinter import ConsolePrinter
 
 from coalib.output.printers.LogPrinter import LogPrinter
-from coalib.parsing import Globbing
 from coalib.settings.ConfigurationGathering import get_config_directory
 from coalib.settings.Section import Section
-from coalib.parsing.Globbing import glob_escape
 
 
 def main(log_printer=None, section: Section=None):
-    start_path = get_config_directory(section)
+    start_path = pathlib.Path(get_config_directory(section))
     log_printer = log_printer or LogPrinter(ConsolePrinter())
 
     if start_path is None:
         return 255
 
     # start_path may have unintended glob characters
-    orig_files = Globbing.glob(os.path.join(
-        glob_escape(start_path), '**', '*.orig'))
+    orig_files = start_path.glob('**/*.orig')
 
     not_deleted = 0
     for ofile in orig_files:
         log_printer.info("Deleting old backup file... "
-                         + os.path.relpath(ofile))
+                         + ofile.relative_to(str(start_path)))
         try:
-            os.remove(ofile)
+            ofile.unlink()
         except OSError as oserror:
             not_deleted += 1
             log_printer.warn("Couldn't delete {}. {}".format(
